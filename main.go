@@ -24,28 +24,26 @@ type Result struct{
 }
 
 func main() {
-	fmt.Println(os.Args)
-
+	//fmt.Println(os.Args)
 	if len(os.Args) > 2{
 		pwd := os.Args[2]
         cmd := os.Args[1]
 
 		if pwd == PASSWORD{
             switch cmd{
-				case "register" : fmt.Println("register")
+				case "register" :
+					fmt.Println("register")
+					register()
                 default : fmt.Printf("unknown command : %s \n", cmd)
    			}
 		}else{
 			fmt.Printf("what did you type in to amuse me ? %s", cmd)
 		}
-
 	}else{
 		fmt.Printf("the service has been started.")
 		http.HandleFunc("/verify", verifyHandler)
 		http.ListenAndServe("localhost:4587", nil)
 	}
-    ser := getSerial()
-	fmt.Printf("serial : %s",ser)
 }
 
 func verifyHandler(res http.ResponseWriter, req *http.Request) {
@@ -59,8 +57,34 @@ func verifyHandler(res http.ResponseWriter, req *http.Request) {
     }
 }
 
+/*
+注册秘钥
+*/
+func register(){
+	serial := getSerial()
+	fmt.Println(serial)
+}
+
+/*
+验证秘钥
+*/
 func verify() bool{
-	return false
+	exist, _ := pathExists(SECRET_FILE)
+	if exist {
+		secret := readFile(SECRET_FILE)
+		serial := getSerial()
+		fmt.Printf("secret:%s \t serial:%s",getSecret(serial), serial)
+		if secret == getSecret(serial){
+			// 秘钥结果很完美
+			return true
+		}else{
+			// 秘钥内容不正确
+			return false
+		}
+	}else{
+		// 秘钥文件不存在
+		return false
+	}
 }
 
 /*
@@ -83,6 +107,10 @@ func md5V1(str string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+func getSecret(serial string) string{
+	return md5V1(serial + "-seeobject")
+}
+
 /*
 获取本机序列号
 */
@@ -96,8 +124,12 @@ func getSerial() string {
 		b := make([]byte, 5)
 		rand.Read(b)
 		serial := convert(b)
-		writeFile(SERIAL_FILE, serial)
-		result = serial
+		err := writeFile(SERIAL_FILE, serial)
+		if err == nil{
+			result = serial
+		} else{
+			fmt.Println(err)
+		}
 	}
 	return result
 }
@@ -118,15 +150,9 @@ func readFile(name string) string {
 /*
 写文件
 */
-func writeFile(name, content string) string{
+func writeFile(name, content string) error{
 	data := []byte(content)
-
-	err := ioutil.WriteFile(name, data, 0644)
-	if err == nil {
-		fmt.Println("写入文件成功:", content)
-	} else {
-		fmt.Println("write file", err)
-	}
+	return ioutil.WriteFile(name, data, 0644)
 }
 
 /*
