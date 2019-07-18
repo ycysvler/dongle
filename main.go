@@ -1,6 +1,7 @@
 package main
 
 import (
+    "encoding/json"
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/hex"
@@ -12,28 +13,54 @@ import (
 	"strings"
 )
 
-const SERIAL_FILE = "/home/seeobject/公共的/serial"
-const SECRET_FILE = "/home/seeobject/公共的/secret"
+const SERIAL_FILE = "./serial"
+const SECRET_FILE = "./secret"
+
+const PASSWORD = "abcd.1234"
+
+type Result struct{
+    Code int          `json:"code"`
+    Message string    `json:"message"`
+}
 
 func main() {
-	fmt.Println("hello")
+	fmt.Println(os.Args)
 
-	ser := getSerial()
-	fmt.Println(ser)
+	if len(os.Args) > 2{
+		pwd := os.Args[2]
+        cmd := os.Args[1]
 
-	// 设置 gin 的模式（调试模式：DebugMode, 发行模式：ReleaseMode）
-	//gin.SetMode(gin.DebugMode)
-	// 创建一个不包含中间件的路由器
-	//r := gin.Default()
-	//r.Run()
+		if pwd == PASSWORD{
+            switch cmd{
+				case "register" : fmt.Println("register")
+                default : fmt.Printf("unknown command : %s \n", cmd)
+   			}
+		}else{
+			fmt.Printf("what did you type in to amuse me ? %s", cmd)
+		}
 
-	http.HandleFunc("/verify", verifyHandler)
-	http.ListenAndServe("localhost:4587", nil)
+	}else{
+		fmt.Printf("the service has been started.")
+		http.HandleFunc("/verify", verifyHandler)
+		http.ListenAndServe("localhost:4587", nil)
+	}
+    ser := getSerial()
+	fmt.Printf("serial : %s",ser)
 }
 
 func verifyHandler(res http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(res, "URL.Path = %q \n", req.URL.Path)
+    v := verify()
+    if v {
+		t, _ := json.Marshal(Result{Code:200, Message:"ok"})
+		fmt.Fprintf(res,"%s", t)
+    }else{
+		f, _ := json.Marshal(Result{Code:401, Message:"服务尚未注册！"})
+		fmt.Fprintf(res,"%s", f)
+    }
+}
 
+func verify() bool{
+	return false
 }
 
 /*
@@ -91,7 +118,7 @@ func readFile(name string) string {
 /*
 写文件
 */
-func writeFile(name, content string) {
+func writeFile(name, content string) string{
 	data := []byte(content)
 
 	err := ioutil.WriteFile(name, data, 0644)
@@ -108,11 +135,9 @@ func writeFile(name, content string) {
 func pathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
-		fmt.Println("PathExists err == nil")
 		return true, nil
 	}
 	if os.IsNotExist(err) {
-		fmt.Println("PathExists os.IsNotExist(err)")
 		return false, nil
 	}
 	return false, err
