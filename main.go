@@ -11,7 +11,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"bufio"
 )
 
 const SERIAL_FILE = "./serial"
@@ -54,35 +53,45 @@ func main() {
 			fmt.Printf("what did you type in to amuse me ?\n")
 		}
 	} else {
-
 		v := verify()
 
-		if v {
-			startServe()
-		} else {
+		//if v {
+		//	startServe()
+		//} else {
+		//	fmt.Printf("服务还未注册！\n")
+		//	fmt.Printf("服务序列号：%s \n", getSerial())
+		//
+		//	for {
+		//		fmt.Printf("请输入注册码 > ")
+		//		input := bufio.NewScanner(os.Stdin)
+		//		input.Scan()
+		//		secret := input.Text()
+		//
+		//		if secret == getSecret(getSerial()) {
+		//			writeFile(SECRET_FILE, secret)
+		//			fmt.Printf("服务注册成功！\n")
+		//			startServe()
+		//		} else {
+		//			fmt.Printf("注册码不正确！\n")
+		//		}
+		//	}
+		//}
+
+		if !v{
 			fmt.Printf("服务还未注册！\n")
-			fmt.Printf("服务序列号：%s \n", getSerial())
-
-			for {
-				fmt.Printf("请输入注册码 > ")
-				input := bufio.NewScanner(os.Stdin)
-				input.Scan()
-				secret := input.Text()
-
-				if secret == getSecret(getSerial()) {
-					writeFile(SECRET_FILE, secret)
-					fmt.Printf("服务注册成功！\n")
-					startServe()
-				} else {
-					fmt.Printf("注册码不正确！\n")
-				}
-			}
 		}
+
+		startServe()
 
 	}
 }
 
+/*
+http:获取注册结果
+*/
 func verifyHandler(res http.ResponseWriter, req *http.Request) {
+	res.Header().Set("Access-Control-Allow-Origin", "*")             //允许访问所有域
+
 	v := verify()
 	if v {
 		t, _ := json.Marshal(Result{Code: 200, Message: "ok"})
@@ -92,6 +101,38 @@ func verifyHandler(res http.ResponseWriter, req *http.Request) {
 		fmt.Fprintf(res, "%s", f)
 	}
 }
+/*
+http:获取序列号
+*/
+func serialHandler(res http.ResponseWriter, req *http.Request) {
+	res.Header().Set("Access-Control-Allow-Origin", "*")             //允许访问所有域
+
+	json, _ := json.Marshal(Result{Code: 200, Message: getSerial()})
+	fmt.Fprintf(res, "%s", json)
+}
+
+func secretHandler(res http.ResponseWriter, req *http.Request) {
+	res.Header().Set("Access-Control-Allow-Origin", "*")             //允许访问所有域
+
+	query := req.URL.Query()
+	if _, ok := query["secret"]; ok {
+		//存在
+		secret := query["secret"][0]
+
+		if secret == getSecret(getSerial()) {
+			writeFile(SECRET_FILE, secret)
+			json, _ := json.Marshal(Result{Code: 200, Message: "successful registration of services"})
+			fmt.Fprintf(res, "%s", json)
+		} else {
+			json, _ := json.Marshal(Result{Code: 401, Message: "invalid secret key"})
+			fmt.Fprintf(res, "%s", json)
+		}
+	}else{
+		json, _ := json.Marshal(Result{Code: 400, Message: "Missing [secret] parameters"})
+		fmt.Fprintf(res, "%s", json)
+	}
+
+}
 
 /*
 启动Web服务
@@ -99,7 +140,10 @@ func verifyHandler(res http.ResponseWriter, req *http.Request) {
 func startServe() {
 	fmt.Printf("the service has been started.")
 	http.HandleFunc("/verify", verifyHandler)
-	http.ListenAndServe("localhost:4587", nil)
+	http.HandleFunc("/serial", serialHandler)
+	http.HandleFunc("/secret", secretHandler)
+
+	http.ListenAndServe("0.0.0.0:4587", nil)
 }
 
 /*
